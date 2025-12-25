@@ -1,0 +1,8 @@
+﻿namespace {{ service_name }}.Application.DTOs;
+
+public class Update{{ entity_name }}Dto
+{
+    {{~ for field in fields ~}}
+    public {{ field.dto_type }} {{ field.name }} { get; set; }{{ if field.is_required }} = default!;{{ end }}
+    {{~ end ~}}
+}

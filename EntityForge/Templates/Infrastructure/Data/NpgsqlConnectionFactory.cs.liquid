@@ -1,0 +1,43 @@
+﻿using System.Data;
+using Npgsql;
+using Polly;
+using Polly.Retry;
+
+namespace {{ service_name }}.Infrastructure.Data;
+
+public class NpgsqlConnectionFactory : IDbConnectionFactory
+{
+    private readonly string _connectionString;
+    private readonly AsyncRetryPolicy _retryPolicy;
+
+    public NpgsqlConnectionFactory(string connectionString)
+    {
+        _connectionString = connectionString;
+        
+        _retryPolicy = Policy
+            .Handle<NpgsqlException>()
+            .Or<TimeoutException>()
+            .WaitAndRetryAsync(
+                retryCount: 5,
+                sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt - 1)),
+                onRetry: (exception, timeSpan, retryCount, context) =>
+                {
+                    Console.WriteLine($"[NpgsqlConnectionFactory] Retry {retryCount}/5 after {timeSpan.TotalSeconds}s due to: {exception.Message}");
+                });
+    }
+
+    public IDbConnection Create()
+    {
+        return new NpgsqlConnection(_connectionString);
+    }
+
+    public async Task<IDbConnection> CreateWithRetryAsync()
+    {
+        return await _retryPolicy.ExecuteAsync(async () =>
+        {
+            var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+            return (IDbConnection)connection;
+        });
+    }
+}

@@ -1,0 +1,8 @@
+﻿CREATE TABLE IF NOT EXISTS {{ table_name }} (
+    id uuid PRIMARY KEY,
+    {{~ for f in fields ~}}
+    {{ f.column_name }} {{ f.sql_type }}{{ if f.is_required }} NOT NULL{{ else }} NULL{{ end }}{{ if !for.last }},{{ end }}
+    {{~ end ~}},
+    created_at timestamp NOT NULL DEFAULT NOW(),
+    updated_at timestamp NULL
+);

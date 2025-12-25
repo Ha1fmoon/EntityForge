@@ -1,0 +1,30 @@
+﻿using System;
+{{~ if has_value_objects ~}}
+using {{ service_name }}.Domain.ValueObjects;
+{{~ end ~}}
+
+namespace {{ service_name }}.Domain.Aggregates;
+
+public partial class {{ entity_name }}
+{
+    public Guid Id { get; set; }
+    {{~ for field in fields ~}}
+    public {{ field.type_name }}{{ if !field.is_required }}?{{ end }} {{ field.name }} { get; set; }{{ if field.is_required }} = default!;{{ end }}
+    {{~ end ~}}
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+
+    public {{ entity_name }}()
+    {
+        Id = Guid.NewGuid();
+        CreatedAt = DateTime.UtcNow;
+        OnInitialize();
+    }
+
+    public void MarkAsUpdated()
+    {
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    partial void OnInitialize();
+}

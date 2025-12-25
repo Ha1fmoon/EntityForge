@@ -1,0 +1,11 @@
+﻿namespace {{ service_name }}.Application.DTOs.Search;
+
+public class {{ entity_name }}FilterDto
+{
+    {{ for f in searchable_fields }}
+    public bool By{{ f.name }} { get; set; }
+    public {{ f.filter_dto_type }} {{ f.name }} { get; set; }
+    {{ end }}
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 50;
+}

@@ -1,0 +1,11 @@
+﻿namespace {{ service_name }}.Application.DTOs;
+
+public class Show{{ entity_name }}Dto
+{
+    public string Id { get; set; } = string.Empty;
+    {{~ for field in fields ~}}
+    public {{ field.dto_type }} {{ field.name }} { get; set; }{{ if field.is_required }} = default!;{{ end }}
+    {{~ end ~}}
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}

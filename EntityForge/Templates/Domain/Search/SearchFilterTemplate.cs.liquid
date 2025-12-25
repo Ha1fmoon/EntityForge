@@ -1,0 +1,17 @@
+﻿using System;
+{{~ if has_value_objects ~}}
+using {{ service_name }}.Domain.ValueObjects;
+{{~ end ~}}
+
+namespace {{ service_name }}.Domain.Search;
+
+public sealed class {{ entity_name }}Filter
+{
+    {{~ for field in fields ~}}
+    public bool By{{ field.name }} { get; init; }
+    public {{ field.type_name }} {{ field.name }} { get; init; }
+    {{~ end ~}}
+
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 50;
+}

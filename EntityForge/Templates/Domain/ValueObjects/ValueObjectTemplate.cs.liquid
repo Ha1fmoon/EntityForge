@@ -1,0 +1,78 @@
+﻿using System;
+{{~ if validation_pattern ~}}
+using System.Text.RegularExpressions;
+{{~ end ~}}
+
+namespace {{ service_name }}.Domain.ValueObjects;
+
+public readonly struct {{ type_name }} : IEquatable<{{ type_name }}>
+{
+    public {{ base_type }} Value { get; }
+    
+    public {{ type_name }}({{ base_type }} value)
+    {
+        {{~ if base_type == "string" ~}}
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException("{{ validation_error_message ?? "Value cannot be empty" }}", nameof(value));
+        var str = value.Trim();
+        {{~ end ~}}
+
+        {{~ if validation_pattern ~}}
+        {{~ if base_type == "string" ~}}
+        if (!Regex.IsMatch(str, @"{{ validation_pattern }}"))
+        {{~ else ~}}
+        if (!Regex.IsMatch(value.ToString(), @"{{ validation_pattern }}"))
+        {{~ end ~}}
+            throw new ArgumentException("{{ validation_error_message ?? "Invalid value format" }}", nameof(value));
+        {{~ end ~}}
+
+        {{~ if max_length && base_type == "string" ~}}
+        if (str.Length > {{ max_length }})
+            throw new ArgumentException($"Value cannot exceed {{ max_length }} characters", nameof(value));
+        {{~ end ~}}
+
+        {{~ if base_type == "string" ~}}
+        Value = str;
+        {{~ else ~}}
+        Value = value;
+        {{~ end ~}}
+    }
+    
+    public bool Equals({{ type_name }} other)
+    {
+        return Value.Equals(other.Value);
+    }
+    
+    public override bool Equals(object? obj)
+    {
+        return obj is {{ type_name }} other && Equals(other);
+    }
+    
+    public override int GetHashCode() => Value.GetHashCode();
+    
+    public static bool operator ==({{ type_name }} left, {{ type_name }} right)
+    {
+        return left.Equals(right);
+    }
+    
+    public static bool operator !=({{ type_name }} left, {{ type_name }} right)
+    {
+        return !(left == right);
+    }
+    
+    public static implicit operator {{ base_type }}({{ type_name }} vo)
+    {
+        return vo.Value;
+    }
+    
+    public static implicit operator {{ type_name }}({{ base_type }} value)
+    {
+        return new {{ type_name }}(value);
+    }
+    
+    {{~ if base_type == "string" ~}}
+    public override string ToString() => Value;
+    {{~ else ~}}
+    public override string ToString() => Value.ToString();
+    {{~ end ~}}
+}

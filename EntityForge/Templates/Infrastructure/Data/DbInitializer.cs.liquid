@@ -1,0 +1,16 @@
+using System.Data;
+
+namespace {{ service_name }}.Infrastructure.Data;
+
+public static class DbInitializer
+{
+    public static void EnsureCreated(IDbConnectionFactory factory)
+    {
+        using var conn = factory.Create();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"{{ schema_sql }}
+                            {{ indexes_sql }}";
+        cmd.ExecuteNonQuery();
+    }
+}

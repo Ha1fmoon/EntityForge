@@ -1,0 +1,9 @@
+﻿{{~ for f in fields ~}}
+{{~ if f.is_unique ~}}
+CREATE UNIQUE INDEX IF NOT EXISTS ux_{{ table_name }}_{{ f.column_name }} ON {{ table_name }}({{ f.column_name }});
+{{~ else ~}}
+{{~ if f.is_searchable ~}}
+CREATE INDEX IF NOT EXISTS ix_{{ table_name }}_{{ f.column_name }} ON {{ table_name }}({{ f.column_name }});
+{{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}

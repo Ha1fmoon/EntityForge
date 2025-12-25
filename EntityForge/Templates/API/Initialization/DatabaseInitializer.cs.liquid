@@ -1,0 +1,46 @@
+using {{ service_name }}.Infrastructure.Data;
+using Npgsql;
+using Polly;
+
+namespace {{ service_name }}.Api.Initialization;
+
+public static class DatabaseInitializer
+{
+    public static async Task InitializeAsync(IServiceProvider services, ILogger logger)
+    {
+        try
+        {
+            using var scope = services.CreateScope();
+            var factory = (NpgsqlConnectionFactory)scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>();
+            
+            var retryPipeline = new ResiliencePipelineBuilder()
+                .AddRetry(new Polly.Retry.RetryStrategyOptions
+                {
+                    ShouldHandle = new PredicateBuilder().Handle<NpgsqlException>().Handle<TimeoutException>(),
+                    MaxRetryAttempts = 5,
+                    Delay = TimeSpan.FromSeconds(1),
+                    BackoffType = Polly.DelayBackoffType.Exponential,
+                    OnRetry = args =>
+                    {
+                        logger.LogWarning("DB connection retry {RetryCount}/5 after {Delay}s: {Error}", 
+                            args.AttemptNumber, args.RetryDelay.TotalSeconds, args.Outcome.Exception?.Message);
+                        return default;
+                    }
+                })
+                .Build();
+            
+            await retryPipeline.ExecuteAsync(async _ =>
+            {
+                using var conn = await factory.CreateWithRetryAsync();
+                DbInitializer.EnsureCreated(factory);
+            });
+            
+            logger.LogInformation("Database schema initialized for '{{ service_name }}'");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to initialize database for '{{ service_name }}' after 5 retries");
+            throw;
+        }
+    }
+}

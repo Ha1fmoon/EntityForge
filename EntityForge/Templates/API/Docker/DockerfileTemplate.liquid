@@ -1,0 +1,21 @@
+﻿# Build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy
+COPY . .
+
+# Restore
+RUN dotnet restore "{{ service_name }}.Api/{{ service_name }}.Api.csproj"
+
+# Build
+RUN dotnet build "{{ service_name }}.Api/{{ service_name }}.Api.csproj" -c Release --no-restore
+
+# Publish
+RUN dotnet publish "{{ service_name }}.Api/{{ service_name }}.Api.csproj" -c Release -o /app/publish --no-restore --no-build
+
+# Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "{{ service_name }}.Api.dll"]

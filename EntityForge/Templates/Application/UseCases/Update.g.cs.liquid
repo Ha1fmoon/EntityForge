@@ -1,0 +1,54 @@
+﻿using System.Threading;
+using {{ service_name }}.Application.DTOs;
+using {{ service_name }}.Application.Mappers;
+using {{ service_name }}.Domain.Aggregates;
+using {{ service_name }}.Domain.Repositories;
+{{~ if has_value_objects ~}}
+using {{ service_name }}.Domain.ValueObjects;
+{{~ end ~}}
+
+namespace {{ service_name }}.Application.UseCases;
+
+public partial class Update{{ entity_name }}
+{
+    private readonly I{{ entity_name }}Repository _repository;
+
+    public Update{{ entity_name }}(I{{ entity_name }}Repository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<bool> ExecuteAsync(Guid id, Update{{ entity_name }}Dto dto, CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken);
+        if (entity == null)
+        {
+            await OnEntityNotFoundAsync(id, cancellationToken);
+            return false;
+        }
+
+        await OnBeforeUpdateAsync(entity, dto, cancellationToken);
+
+        {{ entity_name }}Mapper.ApplyUpdate(entity, dto);
+
+        await OnBeforeSaveAsync(entity, cancellationToken);
+
+        await _repository.UpdateAsync(entity, cancellationToken);
+
+        await OnAfterUpdateAsync(entity, cancellationToken);
+
+        return true;
+    }
+
+    protected virtual Task OnEntityNotFoundAsync(Guid id, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    protected virtual Task OnBeforeUpdateAsync({{ entity_name }} entity, Update{{ entity_name }}Dto dto, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    protected virtual Task OnBeforeSaveAsync({{ entity_name }} entity, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    protected virtual Task OnAfterUpdateAsync({{ entity_name }} entity, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}

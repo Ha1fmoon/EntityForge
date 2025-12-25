@@ -1,0 +1,6 @@
+@EntityForge_HostAddress = http://localhost:5117
+
+GET {{EntityForge_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,34 @@
+﻿using System.Threading;
+using {{ service_name }}.Application.DTOs;
+using {{ service_name }}.Application.Mappers;
+using {{ service_name }}.Domain.Repositories;
+{{~ if has_value_objects ~}}
+using {{ service_name }}.Domain.ValueObjects;
+{{~ end ~}}
+
+namespace {{ service_name }}.Application.UseCases;
+
+public class Get{{ entity_name }}By{{ unique_field.name }}
+{
+    private readonly I{{ entity_name }}Repository _repository;
+
+    public Get{{ entity_name }}By{{ unique_field.name }}(I{{ entity_name }}Repository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<Show{{ entity_name }}Dto?> ExecuteAsync({{ unique_field.base_type }} value, CancellationToken cancellationToken = default)
+    {
+        {{ if unique_field.is_value_object }}try
+        {
+            var key = new {{ unique_field.type_name }}(value);{{ else }}var key = value;{{ end }}
+            var entity = await _repository.GetBy{{ unique_field.name }}Async(key, cancellationToken);
+            if (entity == null) return null;
+            return {{ entity_name }}Mapper.ToShowDto(entity);{{ if unique_field.is_value_object }}
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }{{ end }}
+    }
+}

@@ -1,0 +1,31 @@
+﻿using System.Threading;
+using {{ service_name }}.Application.DTOs;
+using {{ service_name }}.Application.DTOs.Search;
+using {{ service_name }}.Application.Mappers;
+using {{ service_name }}.Domain.Repositories;
+
+namespace {{ service_name }}.Application.UseCases;
+
+public class Search{{ plural_name }}
+{
+    private readonly I{{ entity_name }}Repository _repository;
+
+    public Search{{ plural_name }}(I{{ entity_name }}Repository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<PagedResultDto<Show{{ entity_name }}Dto>> ExecuteAsync({{ entity_name }}FilterDto filterDto, CancellationToken cancellationToken = default)
+    {
+        var filter = {{ entity_name }}Mapper.MapFilter(filterDto);
+        var items = await _repository.SearchAsync(filter, cancellationToken);
+        var total = await _repository.GetTotalCountAsync(filter, cancellationToken);
+        return new PagedResultDto<Show{{ entity_name }}Dto>
+        {
+            Page = filterDto.Page,
+            PageSize = filterDto.PageSize,
+            TotalCount = total,
+            Items = items.Select({{ entity_name }}Mapper.ToShowDto)
+        };
+    }
+}

@@ -1,0 +1,61 @@
+using {{ service_name }}.Application.UseCases;
+using {{ service_name }}.Domain.Repositories;
+using {{ service_name }}.Infrastructure.Repositories;
+using {{ service_name }}.Infrastructure.Data;
+using {{ service_name }}.Api.Initialization;
+using {{ service_name }}.Api.Middleware;
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, configuration) =>
+{
+    configuration
+        .MinimumLevel.Warning()
+        .MinimumLevel.Override("{{ service_name }}", Serilog.Events.LogEventLevel.Information)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Service", "{{ service_name }}")
+        .WriteTo.Console();
+});
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var connectionString = builder.Configuration.GetConnectionString("Default") 
+                     ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default") 
+                     ?? "Host=db;Port=5432;Database={{ db_name }};Username=postgres;Password=postgres";
+
+builder.Services.AddSingleton<IDbConnectionFactory>(_ => new NpgsqlConnectionFactory(connectionString));
+builder.Services.AddScoped<I{{ entity_name }}Repository, {{ entity_name }}Repository>();
+builder.Services.AddScoped<Create{{ entity_name }}>();
+builder.Services.AddScoped<Update{{ entity_name }}>();
+builder.Services.AddScoped<Delete{{ entity_name }}>();
+builder.Services.AddScoped<Get{{ entity_name }}ById>();
+builder.Services.AddScoped<GetAll{{ plural_name }}>();
+
+{{~ if has_search ~}}
+builder.Services.AddScoped<Search{{ plural_name }}>();
+{{~ end ~}}
+
+{{~ for n in unique_field_names ~}}
+builder.Services.AddScoped<Get{{ entity_name }}By{{ n }}>();
+{{~ end ~}}
+
+var app = builder.Build();
+
+app.UseSerilogRequestLogging();
+
+app.UseMiddleware<CorrelationIdMiddleware>();
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.MapGet("/", () => Results.Redirect("/swagger"));
+}
+
+await DatabaseInitializer.InitializeAsync(app.Services, app.Logger);
+
+app.MapGet("/health", () => Results.Ok(new { status = "OK" }));
+app.UseHttpsRedirection();
+app.MapControllers();
+app.Run();

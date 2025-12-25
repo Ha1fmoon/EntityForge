@@ -1,0 +1,8 @@
+﻿using System.Data;
+
+namespace {{ service_name }}.Infrastructure.Data;
+
+public interface IDbConnectionFactory
+{
+    IDbConnection Create();
+}

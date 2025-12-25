@@ -1,0 +1,44 @@
+﻿using System.Threading;
+using {{ service_name }}.Application.DTOs;
+using {{ service_name }}.Application.Mappers;
+using {{ service_name }}.Domain.Aggregates;
+using {{ service_name }}.Domain.Repositories;
+{{~ if has_value_objects ~}}
+using {{ service_name }}.Domain.ValueObjects;
+{{~ end ~}}
+
+namespace {{ service_name }}.Application.UseCases;
+
+public partial class Create{{ entity_name }}
+{
+    private readonly I{{ entity_name }}Repository _repository;
+
+    public Create{{ entity_name }}(I{{ entity_name }}Repository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<Guid> ExecuteAsync(Create{{ entity_name }}Dto dto, CancellationToken cancellationToken = default)
+    {
+        await OnBeforeCreateAsync(dto, cancellationToken);
+
+        var entity = {{ entity_name }}Mapper.FromCreateDto(dto);
+        
+        await OnBeforeSaveAsync(entity, cancellationToken);
+
+        entity = await _repository.AddAsync(entity, cancellationToken);
+
+        await OnAfterCreateAsync(entity, cancellationToken);
+
+        return entity.Id;
+    }
+
+    protected virtual Task OnBeforeCreateAsync(Create{{ entity_name }}Dto dto, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    protected virtual Task OnBeforeSaveAsync({{ entity_name }} entity, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    protected virtual Task OnAfterCreateAsync({{ entity_name }} entity, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}

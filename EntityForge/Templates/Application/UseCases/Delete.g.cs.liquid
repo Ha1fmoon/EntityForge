@@ -1,0 +1,42 @@
+﻿using System.Threading;
+using {{ service_name }}.Domain.Aggregates;
+using {{ service_name }}.Domain.Repositories;
+
+namespace {{ service_name }}.Application.UseCases;
+
+public partial class Delete{{ entity_name }}
+{
+    private readonly I{{ entity_name }}Repository _repository;
+
+    public Delete{{ entity_name }}(I{{ entity_name }}Repository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task ExecuteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken);
+        
+        if (entity == null)
+        {
+            await OnEntityNotFoundAsync(id, cancellationToken);
+            return;
+        }
+
+        await OnBeforeDeleteAsync(entity, cancellationToken);
+
+        await _repository.DeleteAsync(id, cancellationToken);
+
+        await OnAfterDeleteAsync(entity, cancellationToken);
+    }
+
+
+    protected virtual Task OnEntityNotFoundAsync(Guid id, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    protected virtual Task OnBeforeDeleteAsync({{ entity_name }} entity, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    protected virtual Task OnAfterDeleteAsync({{ entity_name }} entity, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}

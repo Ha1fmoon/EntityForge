@@ -1,0 +1,28 @@
+﻿using System.Threading;
+using {{ service_name }}.Application.DTOs;
+using {{ service_name }}.Application.Mappers;
+using {{ service_name }}.Domain.Repositories;
+
+namespace {{ service_name }}.Application.UseCases;
+
+public class GetAll{{ plural_name }}
+{
+    private readonly I{{ entity_name }}Repository _repository;
+
+    public GetAll{{ plural_name }}(I{{ entity_name }}Repository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<IEnumerable<Show{{ entity_name }}Dto>> ExecuteAsync(CancellationToken cancellationToken = default)
+    {
+        var items = await _repository.GetAllAsync(cancellationToken);
+        return items.Select({{ entity_name }}Mapper.ToShowDto);
+    }
+
+    public async Task<IEnumerable<Show{{ entity_name }}Dto>> ExecuteByIdsAsync(List<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        var items = await _repository.GetByIdsAsync(ids, cancellationToken);
+        return items.Select({{ entity_name }}Mapper.ToShowDto);
+    }
+}

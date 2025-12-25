@@ -1,0 +1,186 @@
+﻿using System.Data;
+using Dapper;
+using {{ service_name }}.Domain.Aggregates;
+using {{ service_name }}.Domain.Repositories;
+{{~ if has_searchable_fields ~}}
+using {{ service_name }}.Domain.Search;
+{{~ end ~}}
+{{~ if has_value_objects ~}}
+using {{ service_name }}.Domain.ValueObjects;
+{{~ end ~}}
+using {{ service_name }}.Infrastructure.Data;
+
+namespace {{ service_name }}.Infrastructure.Repositories;
+
+public class {{ entity_name }}Repository : I{{ entity_name }}Repository
+{
+    private readonly IDbConnectionFactory _connectionFactory;
+
+    public {{ entity_name }}Repository(IDbConnectionFactory connectionFactory)
+    {
+        _connectionFactory = connectionFactory;
+    }
+
+    public async Task<{{ entity_name }}?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.Create();
+        var sql = "SELECT id, {{~ for f in all_fields ~}}{{ f.column_name }}{{ if !for.last }}, {{ end }}{{~ end ~}}, created_at, updated_at FROM {{ table_name }} WHERE id = @id LIMIT 1";
+        var result = await connection.QuerySingleOrDefaultAsync<dynamic>(sql, new { id });
+        if (result == null) return null;
+        return MapToDomain(result);
+    }
+
+    public async Task<IEnumerable<{{ entity_name }}>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.Create();
+        var sql = "SELECT id, {{~ for f in all_fields ~}}{{ f.column_name }}{{ if !for.last }}, {{ end }}{{~ end ~}}, created_at, updated_at FROM {{ table_name }}";
+        var rows = await connection.QueryAsync<dynamic>(sql);
+        return rows.Select(MapToDomain);
+    }
+
+    public async Task<IEnumerable<{{ entity_name }}>> GetByIdsAsync(List<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids == null || ids.Count == 0)
+            return Enumerable.Empty<{{ entity_name }}>();
+
+        using var connection = _connectionFactory.Create();
+        var sql = "SELECT id, {{~ for f in all_fields ~}}{{ f.column_name }}{{ if !for.last }}, {{ end }}{{~ end ~}}, created_at, updated_at FROM {{ table_name }} WHERE id = ANY(@Ids)";
+        var rows = await connection.QueryAsync<dynamic>(sql, new { Ids = ids.ToArray() });
+        return rows.Select(MapToDomain);
+    }
+
+    public async Task<{{ entity_name }}> AddAsync({{ entity_name }} {{ entity_parameter_name }}, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.Create();
+        var sql = @"INSERT INTO {{ table_name }} (id, {{~ for f in all_fields ~}}{{ f.column_name }}{{ if !for.last }}, {{ end }}{{~ end ~}}, created_at)
+        VALUES (@Id, {{~ for f in all_fields ~}}@{{ f.column_name }}{{ if !for.last }}, {{ end }}{{~ end ~}}, @CreatedAt);";
+        var parameters = new DynamicParameters();
+        parameters.Add("Id", {{ entity_parameter_name }}.Id);
+        {{~ for f in all_fields ~}}
+        parameters.Add("{{ f.column_name }}", {{ entity_parameter_name }}.{{ f.name }}{{ if f.is_value_object }}{{ if !f.is_required }}?.Value{{ else }}.Value{{ end }}{{ end }});
+        {{~ end ~}}
+        parameters.Add("CreatedAt", {{ entity_parameter_name }}.CreatedAt);
+        await connection.ExecuteAsync(sql, parameters);
+        return {{ entity_parameter_name }};
+    }
+
+    public async Task<{{ entity_name }}> UpdateAsync({{ entity_name }} {{ entity_parameter_name }}, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.Create();
+        var sql = @"UPDATE {{ table_name }} SET 
+            {{~ for f in all_fields ~}}
+            {{ f.column_name }} = @{{ f.column_name }},
+            {{~ end ~}}
+            updated_at = @UpdatedAt
+            WHERE id = @Id";
+        var parameters = new DynamicParameters();
+        parameters.Add("Id", {{ entity_parameter_name }}.Id);
+        {{~ for f in all_fields ~}}
+        parameters.Add("{{ f.column_name }}", {{ entity_parameter_name }}.{{ f.name }}{{ if f.is_value_object }}{{ if !f.is_required }}?.Value{{ else }}.Value{{ end }}{{ end }});
+        {{~ end ~}}
+        parameters.Add("UpdatedAt", {{ entity_parameter_name }}.UpdatedAt ?? DateTime.UtcNow);
+        await connection.ExecuteAsync(sql, parameters);
+        return {{ entity_parameter_name }};
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.Create();
+        var sql = "DELETE FROM {{ table_name }} WHERE id = @id";
+        await connection.ExecuteAsync(sql, new { id });
+    }
+
+    public async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.Create();
+        var sql = "SELECT 1 FROM {{ table_name }} WHERE id = @id LIMIT 1";
+        var value = await connection.ExecuteScalarAsync<int?>(sql, new { id });
+        return value.HasValue;
+    }
+
+    {{~ for uf in unique_fields ~}}
+    public async Task<{{ entity_name }}?> GetBy{{ uf.name }}Async({{ uf.type_name }} {{ uf.parameter_name }}, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.Create();
+        var sql = "SELECT id, {{~ for f in all_fields ~}}{{ f.column_name }}{{ if !for.last }}, {{ end }}{{~ end ~}}, created_at, updated_at FROM {{ table_name }} WHERE {{ uf.column_name }} = @value LIMIT 1";
+        var value = {{ if uf.is_value_object }}{{ uf.parameter_name }}.Value{{ else }}{{ uf.parameter_name }}{{ end }};
+        var result = await connection.QuerySingleOrDefaultAsync<dynamic>(sql, new { value });
+        return result == null ? null : MapToDomain(result);
+    }
+    {{~ end ~}}
+
+    {{~ if searchable_fields.size > 0 ~}}
+    public async Task<IEnumerable<{{ entity_name }}>> SearchAsync({{ entity_name }}Filter filter, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.Create();
+        var where = new List<string>();
+        var parameters = new DynamicParameters();
+        {{~ for sf in searchable_fields ~}}
+        if (filter.By{{ sf.name }})
+        {
+            {{~ if sf.base_type == "string" ~}}
+            parameters.Add("{{ sf.column_name }}Pattern", "%" + ({{ if sf.is_value_object }}filter.{{ sf.name }}.Value{{ else }}filter.{{ sf.name }}{{ end }}) + "%");
+            where.Add("{{ sf.column_name }} ILIKE @{{ sf.column_name }}Pattern");
+            {{~ else ~}}
+            parameters.Add("{{ sf.column_name }}", {{ if sf.is_value_object }}filter.{{ sf.name }}.Value{{ else }}filter.{{ sf.name }}{{ end }});
+            where.Add("{{ sf.column_name }} = @{{ sf.column_name }}");
+            {{~ end ~}}
+        }
+        {{~ end ~}}
+        parameters.Add("PageSize", filter.PageSize);
+        parameters.Add("Offset", (filter.Page - 1) * filter.PageSize);
+        var whereSql = where.Count > 0 ? (" WHERE " + string.Join(" AND ", where)) : string.Empty;
+        var sql = $"SELECT id, {{~ for f in all_fields ~}}{{ f.column_name }}{{ if !for.last }}, {{ end }}{{~ end ~}}, created_at, updated_at FROM {{ table_name }}{whereSql} ORDER BY created_at DESC LIMIT @PageSize OFFSET @Offset";
+        var rows = await connection.QueryAsync<dynamic>(sql, parameters);
+        return rows.Select(MapToDomain);
+    }
+
+    public async Task<int> GetTotalCountAsync({{ entity_name }}Filter filter, CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.Create();
+        var where = new List<string>();
+        var parameters = new DynamicParameters();
+        {{~ for sf in searchable_fields ~}}
+        if (filter.By{{ sf.name }})
+        {
+            {{~ if sf.base_type == "string" ~}}
+            parameters.Add("{{ sf.column_name }}Pattern", "%" + ({{ if sf.is_value_object }}filter.{{ sf.name }}.Value{{ else }}filter.{{ sf.name }}{{ end }}) + "%");
+            where.Add("{{ sf.column_name }} ILIKE @{{ sf.column_name }}Pattern");
+            {{~ else ~}}
+            parameters.Add("{{ sf.column_name }}", {{ if sf.is_value_object }}filter.{{ sf.name }}.Value{{ else }}filter.{{ sf.name }}{{ end }});
+            where.Add("{{ sf.column_name }} = @{{ sf.column_name }}");
+            {{~ end ~}}
+        }
+        {{~ end ~}}
+        var whereSql = where.Count > 0 ? (" WHERE " + string.Join(" AND ", where)) : string.Empty;
+        var sql = $"SELECT COUNT(*) FROM {{ table_name }}{whereSql}";
+        return await connection.ExecuteScalarAsync<int>(sql, parameters);
+    }
+    {{~ end ~}}
+
+    private {{ entity_name }} MapToDomain(dynamic row)
+    {
+        var entity = new {{ entity_name }}
+        {
+            Id = (Guid)row.id,
+            {{~ for f in all_fields ~}}
+            {{~ if f.is_value_object ~}}
+            {{~ if f.is_required ~}}
+            {{ f.name }} = new {{ f.type_name }}(({{ f.base_type }})row.{{ f.column_name }}),
+            {{~ else ~}}
+            {{ f.name }} = row.{{ f.column_name }} != null ? new {{ f.type_name }}(({{ f.base_type }})row.{{ f.column_name }}) : null,
+            {{~ end ~}}
+            {{~ else ~}}
+            {{~ if f.is_required ~}}
+            {{ f.name }} = ({{ f.type_name }})row.{{ f.column_name }},
+            {{~ else ~}}
+            {{ f.name }} = row.{{ f.column_name }} != null ? ({{ f.base_type }})row.{{ f.column_name }} : null,
+            {{~ end ~}}
+            {{~ end ~}}
+            {{~ end ~}}
+            CreatedAt = row.created_at != null ? (DateTime)row.created_at : DateTime.UtcNow,
+            UpdatedAt = row.updated_at != null ? (DateTime?)row.updated_at : null
+        };
+        return entity;
+    }
+}

@@ -1,0 +1,96 @@
+﻿using {{ service_name }}.Application.DTOs;
+{{~ if has_searchable_fields ~}}
+using {{ service_name }}.Application.DTOs.Search;
+using {{ service_name }}.Domain.Search;
+{{~ end ~}}
+using {{ service_name }}.Domain.Aggregates;
+{{~ if has_value_objects ~}}
+using {{ service_name }}.Domain.ValueObjects;
+{{~ end ~}}
+
+namespace {{ service_name }}.Application.Mappers;
+
+public static class {{ entity_name }}Mapper
+{
+    public static Show{{ entity_name }}Dto ToShowDto({{ entity_name }} x)
+    {
+        return new Show{{ entity_name }}Dto
+        {
+            Id = x.Id.ToString(),
+            {{~ for f in fields ~}}
+            {{~ if f.is_value_object ~}}
+            {{~ if f.is_required ~}}
+            {{ f.name }} = x.{{ f.name }}.Value,
+            {{~ else ~}}
+            {{ f.name }} = x.{{ f.name }}?.Value,
+            {{~ end ~}}
+            {{~ else ~}}
+            {{ f.name }} = x.{{ f.name }},
+            {{~ end ~}}
+            {{~ end ~}}
+            CreatedAt = x.CreatedAt,
+            UpdatedAt = x.UpdatedAt
+        };
+    }
+
+    public static {{ entity_name }} FromCreateDto(Create{{ entity_name }}Dto dto)
+    {
+        var entity = new {{ entity_name }}();
+        {{~ for f in fields ~}}
+        {{~ if f.is_value_object ~}}
+        {{~ if f.is_required ~}}
+        entity.{{ f.name }} = new {{ f.type_name }}(dto.{{ f.name }});
+        {{~ else ~}}
+        entity.{{ f.name }} = dto.{{ f.name }} != null ? new {{ f.type_name }}(dto.{{ f.name }}) : null;
+        {{~ end ~}}
+        {{~ else ~}}
+        entity.{{ f.name }} = dto.{{ f.name }};
+        {{~ end ~}}
+        {{~ end ~}}
+
+        return entity;
+    }
+
+    public static void ApplyUpdate({{ entity_name }} entity, Update{{ entity_name }}Dto dto)
+    {
+        {{~ for f in fields ~}}
+        {{~ if f.is_value_object ~}}
+        {{~ if f.is_required ~}}
+        entity.{{ f.name }} = new {{ f.type_name }}(dto.{{ f.name }});
+        {{~ else ~}}
+        entity.{{ f.name }} = dto.{{ f.name }} != null ? new {{ f.type_name }}(dto.{{ f.name }}) : null;
+        {{~ end ~}}
+        {{~ else ~}}
+        entity.{{ f.name }} = dto.{{ f.name }};
+        {{~ end ~}}
+        {{~ end ~}}
+        entity.MarkAsUpdated();
+    }
+
+    {{~ if has_searchable_fields ~}}
+    public static {{ entity_name }}Filter MapFilter({{ entity_name }}FilterDto dto)
+    {
+        return new {{ entity_name }}Filter
+        {
+            {{~ for f in searchable_fields ~}}
+            By{{ f.name }} = dto.By{{ f.name }} && dto.{{ f.name }} != null,
+            {{~ if f.is_value_object ~}}
+            {{ f.name }} = dto.By{{ f.name }} && dto.{{ f.name }} != null 
+                ? new {{ f.type_name }}(dto.{{ f.name }}!) 
+                : default!,
+            {{~ else if f.is_value_type ~}}
+            {{ f.name }} = dto.By{{ f.name }} && dto.{{ f.name }} != null 
+                ? dto.{{ f.name }}.Value 
+                : default,
+            {{~ else ~}}
+            {{ f.name }} = dto.By{{ f.name }} && dto.{{ f.name }} != null 
+                ? dto.{{ f.name }}! 
+                : default!,
+            {{~ end ~}}
+            {{~ end ~}}
+            Page = dto.Page,
+            PageSize = dto.PageSize
+        };
+    }
+    {{~ end ~}}
+}

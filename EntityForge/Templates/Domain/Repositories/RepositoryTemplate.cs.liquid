@@ -1,0 +1,33 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using {{ service_name }}.Domain.Aggregates;
+{{~ if has_value_objects ~}}
+using {{ service_name }}.Domain.ValueObjects;
+{{~ end ~}}
+{{~ if has_searchable_fields ~}}
+using {{ service_name }}.Domain.Search;
+{{~ end ~}}
+
+namespace {{ service_name }}.Domain.Repositories;
+
+public interface I{{ entity_name }}Repository
+{
+    Task<{{ entity_name }}?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<{{ entity_name }}>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IEnumerable<{{ entity_name }}>> GetByIdsAsync(List<Guid> ids, CancellationToken cancellationToken = default);
+    Task<{{ entity_name }}> AddAsync({{ entity_name }} {{ entity_parameter_name }}, CancellationToken cancellationToken = default);
+    Task<{{ entity_name }}> UpdateAsync({{ entity_name }} {{ entity_parameter_name }}, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
+
+    {{~ for field in unique_fields ~}}
+    Task<{{ entity_name }}?> GetBy{{ field.name }}Async({{ field.type_name }} {{ field.parameter_name }}, CancellationToken cancellationToken = default);
+    {{~ end ~}}
+
+    {{~ if searchable_fields.size > 0 ~}}
+    Task<IEnumerable<{{ entity_name }}>> SearchAsync({{ entity_name }}Filter filter, CancellationToken cancellationToken = default);
+    Task<int> GetTotalCountAsync({{ entity_name }}Filter filter, CancellationToken cancellationToken = default);
+    {{~ end ~}}
+}

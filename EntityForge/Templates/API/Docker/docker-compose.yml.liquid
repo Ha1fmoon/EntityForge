@@ -1,0 +1,43 @@
+services:
+  {{ service_name_lower }}_app:
+    image: {{ image_tag }}
+    container_name: {{ service_name_lower }}_app
+    restart: unless-stopped
+    depends_on:
+      {{ service_name_lower }}_db:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Default=Host={{ service_name_lower }}_db;Port=5432;Database={{ db_name }};Username=postgres;Password=postgres
+    ports:
+      - "{{ app_port }}:8080"
+    networks:
+      - {{ service_name_lower }}_network
+  
+  {{ service_name_lower }}_db:
+    image: postgres:16-alpine
+    container_name: {{ service_name_lower }}_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB={{ db_name }}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "{{ db_port }}:5432"
+    volumes:
+      - {{ service_name_lower }}_db_data:/var/lib/postgresql/data
+      - ./Sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - {{ service_name_lower }}_network
+
+volumes:
+  {{ service_name_lower }}_db_data:
+
+networks:
+  {{ service_name_lower }}_network:
+    driver: bridge

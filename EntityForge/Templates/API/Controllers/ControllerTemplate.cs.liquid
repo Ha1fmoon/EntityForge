@@ -1,0 +1,110 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using System.Threading;
+using {{ service_name }}.Application.DTOs;
+using {{ service_name }}.Application.UseCases;
+
+namespace {{ service_name }}.Api.Controllers;
+
+[ApiController]
+[Route("api/{{ route_name }}")]
+public class {{ entity_plural }}Controller : ControllerBase
+{
+    private readonly Create{{ entity_name }} _create;
+    private readonly Update{{ entity_name }} _update;
+    private readonly Delete{{ entity_name }} _delete;
+    private readonly Get{{ entity_name }}ById _getById;
+    private readonly GetAll{{ entity_plural }} _getAll;
+    {{~ if searchable_fields.size > 0 ~}}
+    private readonly Search{{ entity_plural }} _search;
+    {{~ end ~}}
+    {{~ for uf in unique_fields ~}}
+    private readonly Get{{ entity_name }}By{{ uf.name }} _getBy{{ uf.name }};
+    {{~ end ~}}
+
+    public {{ entity_plural }}Controller(
+        Create{{ entity_name }} create,
+        Update{{ entity_name }} update,
+        Delete{{ entity_name }} delete,
+        Get{{ entity_name }}ById getById,
+        GetAll{{ entity_plural }} getAll
+        {{~ if searchable_fields.size > 0 ~}}, Search{{ entity_plural }} search{{~ end ~}}
+        {{~ for uf in unique_fields ~}}, Get{{ entity_name }}By{{ uf.name }} getBy{{ uf.name }}{{~ end ~}}
+    )
+    {
+        _create = create;
+        _update = update;
+        _delete = delete;
+        _getById = getById;
+        _getAll = getAll;
+        {{~ if searchable_fields.size > 0 ~}}_search = search;{{~ end ~}}
+        {{~ for uf in unique_fields ~}}_getBy{{ uf.name }} = getBy{{ uf.name }};{{~ end ~}}
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<Guid>> Create([FromBody] Create{{ entity_name }}Dto request, CancellationToken ct)
+    {
+        var id = await _create.ExecuteAsync(request, ct);
+        return StatusCode(201, id);
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<Show{{ entity_name }}Dto>>> GetAll([FromQuery] string? ids, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(ids))
+        {
+            var items = await _getAll.ExecuteAsync(ct);
+            return Ok(items);
+        }
+
+        var idList = ids.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(Guid.Parse)
+                        .ToList();
+        
+        var result = await _getAll.ExecuteByIdsAsync(idList, ct);
+        return Ok(result);
+    }
+
+    {{~ if searchable_fields.size > 0 ~}}
+    [HttpGet("search")]
+    public async Task<ActionResult<PagedResultDto<Show{{ entity_name }}Dto>>> Search(
+        [FromQuery] {{ service_name }}.Application.DTOs.Search.{{ entity_name }}FilterDto filter, CancellationToken ct)
+    {
+        var result = await _search.ExecuteAsync(filter, ct);
+        return Ok(result);
+    }
+    {{~ end ~}}
+
+    [HttpGet("by-id/{id:guid}")]
+    public async Task<ActionResult<Show{{ entity_name }}Dto>> GetById([FromRoute] Guid id, CancellationToken ct)
+    {
+        var result = await _getById.ExecuteAsync(id, ct);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
+
+    {{~ for uf in unique_fields ~}}
+    [HttpGet("by-{{ string.downcase uf.name }}")]
+    public async Task<ActionResult<Show{{ entity_name }}Dto>> GetBy{{ uf.name }}(
+        [FromQuery] {{ uf.base_type }} value, CancellationToken ct)
+    {
+        var result = await _getBy{{ uf.name }}.ExecuteAsync(value, ct);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
+    {{~ end ~}}
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult> Update([FromRoute] Guid id, [FromBody] Update{{ entity_name }}Dto request, CancellationToken ct)
+    {
+        var updated = await _update.ExecuteAsync(id, request, ct);
+        if (!updated) return NotFound();
+        return NoContent();
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
+    {
+        await _delete.ExecuteAsync(id, ct);
+        return NoContent();
+    }
+}
